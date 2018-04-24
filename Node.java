@@ -28,7 +28,7 @@ public class Node implements MessageHandling {
         this.num_peers = num_peers;
 
         //TODO: instantiate your blockchain implementation and set the difficulty to 20.
-        blockChainManager = new BlockChain();
+        blockChainManager = new BlockChain(this.id, this);
         blockChainManager.setDifficulty(20);
     }
 
