@@ -68,12 +68,26 @@ public class Block {
     // TODO: Override toString and fromString methods
 
     public static Block fromString(String s){
-        return null;
+        // s has the format as "hash,previousHash,data,timestamp"
+        String [] fields = s.split(",");
+
+        String hash = fields[0];
+        String previousHash = fields[1];
+        String data = fields[2];
+        long timestamp = Long.parseLong(fields[3]);
+
+        return new Block(hash, previousHash, data, timestamp);
+
     }
 
     @Override
     public String toString() {
-        return "temp String";
+        String result = "";
+        result += this.hash + ",";
+        result += this.previousHash + ",";
+        result += this.data +",";
+        result += this.timestamp;
+        return result;
     }
 
 }

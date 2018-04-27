@@ -29,7 +29,7 @@ public class Node implements MessageHandling {
 
         //TODO: instantiate your blockchain implementation and set the difficulty to 20.
         blockChainManager = new BlockChain(this.id, this);
-        blockChainManager.setDifficulty(20);
+        blockChainManager.setDifficulty(4);
     }
 
     /**
