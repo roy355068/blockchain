@@ -4,7 +4,7 @@ import java.rmi.RemoteException;
 
 /**
  * This class is for the distributed miner node, each Node is a client to for
- * mining new blocks and add them into the peer-to-peer blockchain network.
+ * mining new chain and add them into the peer-to-peer blockchain network.
  */
 public class Node implements MessageHandling {
     private int id;
@@ -29,7 +29,7 @@ public class Node implements MessageHandling {
 
         //TODO: instantiate your blockchain implementation and set the difficulty to 20.
         blockChainManager = new BlockChain(this.id, this);
-        blockChainManager.setDifficulty(4);
+        blockChainManager.setDifficulty(20);
     }
 
     /**

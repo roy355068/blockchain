@@ -1,134 +1,102 @@
 import lib.Block;
-
-import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.codec.digest.DigestUtils;
 import java.rmi.RemoteException;
-import java.sql.Timestamp;
-import java.util.*;
-import org.apache.commons.codec.binary.Base64;
+import java.util.Random;
 
 public class BlockChain implements BlockChainBase {
-
-
-    /* Should have fields:
-     *      int id            -> node's ID passed from the Node when instantiating the BlockChain object
-     *      Node node         -> node that this ledger associated with
-     *      byte[] blockChain -> Download from the peers, using downloadBlockchain() to set the value as byte[]
-     *      Block genesisBlock-> The genesis block of the current block chain
-     *      Block lastBlock   -> The last block of the current block chain
-     *      int difficulty    -> Difficulty level of the proof-of-work
-     */
-
-    // genesisBlock
-    // id
-    // difficulty
-    // node
-    // List<Block>
-
+    private int difficulty;
     private int id;
     private Node node;
     private Block genesisBlock;
-    private int difficulty;
-    private List<Block> chain;
+    List<Block> chain;
+    Block newBlock;
 
+    public BlockChain(int id, Node node) {
 
-    private Block newBlock;
-
-    public BlockChain(int nodeId, Node node) {
-        this.id = nodeId;
+        this.id = id;
         this.node = node;
-        this.chain = new LinkedList<>();
-        this.chain.add(createGenesisBlock());
+        chain = new ArrayList<>();
+        chain.add(createGenesisBlock());
+
     }
 
     @Override
     public boolean addBlock(Block block) {
-
-        Block prevBlock = getLastBlock();
-        boolean accepted = isValidNewBlock(block, prevBlock);
-        this.chain.add(block);
-        return accepted;
-
+        boolean valid = isValidNewBlock(block, getLastBlock());
+        if (valid) {
+            chain.add(block);
+        }
+        return valid;
     }
 
+
     @Override
-    public Block createGenesisBlock() {
+    public Block createGenesisBlock(){
         byte[] hashBytes = new byte[32];
-        new Random().nextBytes(hashBytes);
-        String hash = new String(hashBytes, Charset.forName("utf-8"));
-
-        byte[] prevHash = new byte[32];
-        new Random().nextBytes(prevHash);
-        String previousHash = new String(prevHash, Charset.forName("utf-8"));
-
-        byte[] dataBytes = new byte[32];
-        new Random().nextBytes(dataBytes);
-        String data = new String(dataBytes, Charset.forName("utf-8"));
-
-        Block genesisBlock = new Block(hash, previousHash, data, 0);
-        this.genesisBlock = genesisBlock;
+        String genesisHash = new String(hashBytes);
+        String blockStr = genesisHash + ",,genesis," + 0 + "," + 0 + "," + difficulty +"," + 0;
+        genesisBlock = Block.fromString(blockStr);
         return genesisBlock;
     }
 
+
     @Override
     public byte[] createNewBlock(String data) {
+        long timestamp = System.currentTimeMillis();
+        String previousHash = getLastBlock().getHash();
+        int index = getLastBlock().getIndex() + 1;
+        long nonce = new Random().nextLong();
+        String hash = "";
+        while  (!testDifficulty(difficulty, hash)) {
 
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < difficulty / 4; i++ ) {
-            sb.append("0");
+            String hashData = nonce + "," + previousHash + "," + data + "," + this.difficulty + "," + timestamp;
+            hash = DigestUtils.sha256Hex(hashData.getBytes());
+            nonce++;
         }
-        String prefix = sb.toString();
-
-
-        String prevHash = getLastBlock().getHash();
-        Timestamp tempTime = new Timestamp(System.currentTimeMillis());
-        long timestamp = tempTime.getTime();
-
-        String hash = UUID.randomUUID().toString();
-        while (!hash.startsWith(prefix)) {
-            String nonce = UUID.randomUUID().toString();
-            String hashData = nonce + prevHash + this.difficulty + timestamp;
-            byte[] bData = hashData.getBytes();
-            hash = org.apache.commons.codec.binary.Base64.encodeBase64String(bData);
-
-
-//        List<Byte> binaryData = new LinkedList<>();
-//        for (byte b : prevHash.getBytes()) {
-//            binaryData.add(b);
-//        }
-//        for (byte b : Integer.toString(this.difficulty).getBytes()) {
-//            binaryData.add(b);
-//        }
-//        for (byte b : Long.toString(timestamp).getBytes()) {
-//            binaryData.add(b);
-//        }
-//        byte [] bData = new byte [binaryData.size()];
-//        for (int i = 0 ; i < binaryData.size(); i++) {
-//            bData[i] = binaryData.get(i);
-//        }
-
-
-        }
-        String construct = hash + "," + prevHash + "," + data + "," + Long.toString(timestamp);
-        Block newBlock = Block.fromString(construct);
-        this.newBlock = newBlock;
+        String blockStr = hash + "," + previousHash + "," + data + "," + timestamp + "," + nonce + "," + difficulty + "," + index;
+        newBlock = Block.fromString(blockStr);
         return newBlock.toString().getBytes();
+    }
+
+
+    /**
+     * Helper function. Check if the hash is starts with #difficulty zeros.
+     * @param difficulty the difficulty of mining the new block.
+     * @param hash the SHA256 hash generated from the information of a block
+     * @return true if the hash has correct answer, false otherwise
+     */
+    private boolean testDifficulty(int difficulty, String hash) {
+
+        int count = 0;
+        for (int i = 0 ; i < hash.length() ; i++) {
+            int currentByte = Integer.parseInt(String.valueOf(hash.charAt(i)), 16);
+            if (currentByte == 0) {
+                count += 4;
+            }
+            if (count == difficulty || currentByte != 0) {
+                break;
+            }
+        }
+        return count == difficulty;
     }
 
     @Override
     public boolean broadcastNewBlock() {
-        boolean success = false;
-        for (int i = 0; i < node.getPeerNumber(); i++) {
+
+        for (int i = 0; i < this.node.getPeerNumber(); i++) {
             try {
-                if (!node.broadcastNewBlockToPeer(i, this.newBlock.toString().getBytes())) {
-//                if (!node.broadcastNewBlockToPeer(i, getLastBlock().toString().getBytes())) {
+                if (!this.node.broadcastNewBlockToPeer(i, newBlock.toString().getBytes())) {
                     return false;
                 }
             } catch (RemoteException e) {
                 e.printStackTrace();
+                return false;
             }
-
         }
         return true;
+
     }
 
     @Override
@@ -138,49 +106,44 @@ public class BlockChain implements BlockChainBase {
 
     @Override
     public byte[] getBlockchainData() {
-        List<Byte> returnBytes = new LinkedList<>();
-        for (Block block : this.chain) {
-            String blockData = block.toString() + "/";
-            for (byte dataByte : blockData.getBytes()) {
-                returnBytes.add(dataByte);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < this.chain.size(); i++) {
+            String blockStr = this.chain.get(i).toString();
+            sb.append(blockStr);
+            if (i < this.chain.size() - 1) {
+                sb.append("/");
             }
         }
-        byte [] result = new byte[returnBytes.size()];
-        for (int i = 0 ; i < returnBytes.size() ; i++) {
-            result[i] = returnBytes.get(i);
-        }
-        return result;
+        return sb.toString().getBytes();
+
     }
 
     @Override
     public void downloadBlockchain() {
-
-//        List<Block> candidateChain = this.chain;
+        String [] candidateChain = new String[0];
+        int candidateLength = getBlockChainLength();
         for (int i = 0; i < this.node.getPeerNumber(); i++) {
-            List<Block> candidateChain = new LinkedList<>();
+            if (i == this.id) {
+                continue;
+            }
             try {
-                byte [] dataFromPeer = this.node.getBlockChainDataFromPeer(i);
+                byte[] dataFromPeer = this.node.getBlockChainDataFromPeer(i);
                 String blockData = new String(dataFromPeer);
                 String [] blockStrings = blockData.split("/");
-                for (String str : blockStrings) {
-                    Block newBlock = Block.fromString(str);
-                    candidateChain.add(newBlock);
+                int length = blockStrings.length;
+                if (length > candidateLength) {
+                    candidateLength = length;
+                    candidateChain = blockStrings;
                 }
-
-                Block lastBlock = candidateChain.get(candidateChain.size() - 1);
-                int length = candidateChain.size();
-                if (getBlockChainLength() < length) {
-                    this.chain = candidateChain;
-                }
-                else if (lastBlock.getTimestamp() < getLastBlock().getTimestamp()) {
-                    this.chain = candidateChain;
-                }
-
             } catch (RemoteException e) {
                 e.printStackTrace();
             }
         }
 
+        this.chain = new ArrayList<>();
+        for (String blockStr : candidateChain) {
+            this.chain.add(Block.fromString(blockStr));
+        }
     }
 
     @Override
@@ -190,15 +153,12 @@ public class BlockChain implements BlockChainBase {
 
     @Override
     public boolean isValidNewBlock(Block newBlock, Block prevBlock) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < difficulty / 4; i++ ) {
-            sb.append("0");
-        }
-        String prefix = sb.toString();
         boolean accepted = false;
         if (!prevBlock.getHash().equals(newBlock.getPreviousHash())) {
             accepted = false;
-        } else if (!newBlock.getHash().startsWith(prefix)) {
+        } else if (!testDifficulty(difficulty, newBlock.getHash())) {
+            accepted = false;
+        } else if (newBlock.getIndex() != prevBlock.getIndex() + 1) {
             accepted = false;
         } else {
             accepted = true;
@@ -208,13 +168,12 @@ public class BlockChain implements BlockChainBase {
 
     @Override
     public Block getLastBlock() {
-
-        return this.chain.get(this.chain.size() - 1);
+        return this.chain.get(getBlockChainLength() - 1);
     }
+
 
     @Override
     public int getBlockChainLength() {
         return this.chain.size();
     }
-
 }

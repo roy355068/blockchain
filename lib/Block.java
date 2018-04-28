@@ -17,6 +17,8 @@ public class Block {
 
     private long nonce;
 
+    private int index;
+
     public Block() {}
 
     public Block(String hash, String previousHash, String data,
@@ -63,31 +65,45 @@ public class Block {
         return timestamp;
     }
 
+    public int getIndex() {
+        return this.index;
+    }
 
 
     // TODO: Override toString and fromString methods
-
     public static Block fromString(String s){
-        // s has the format as "hash,previousHash,data,timestamp"
-        String [] fields = s.split(",");
 
-        String hash = fields[0];
-        String previousHash = fields[1];
-        String data = fields[2];
-        long timestamp = Long.parseLong(fields[3]);
-
-        return new Block(hash, previousHash, data, timestamp);
-
+        String[] arr = s.split(",");
+        String hash = arr[0];
+        String previousHash = arr[1];
+        String data = arr[2];
+        long timestamp = Long.parseLong(arr[3]);
+        long nonce = Long.parseLong(arr[4]);
+        int difficulty = Integer.parseInt(arr[5]);
+        int index = Integer.parseInt(arr[6]);
+        Block newBlock = new Block(hash, previousHash, data, timestamp);
+        newBlock.nonce = nonce;
+        newBlock.difficulty = difficulty;
+        newBlock.index = index;
+        return newBlock;
     }
+
 
     @Override
     public String toString() {
+
         String result = "";
-        result += this.hash + ",";
-        result += this.previousHash + ",";
-        result += this.data +",";
-        result += this.timestamp;
+        result += hash + ",";
+        result += previousHash + ",";
+        result += data + ",";
+        result += timestamp + ",";
+        result += nonce + ",";
+        result += difficulty + ",";
+        result += index;
         return result;
+
     }
 
+
 }
+
